@@ -27,30 +27,7 @@ API模块是game_room，以下是主要的函数说明:
 -spec (new(Type::term(), SubType::term()) -> undefined | {RoomId::integer(), Pid::pid()} | term()).
 ```
 
-获取符合条件的房间列表
-例如：查询所有有人的房间 Cond :: fun(#game_room{id = Id, num = Num}) when Num > 0 -> Id end.
-```
--spec (select(Type::term(), Cond::function()) -> list()).
--spec (select_n(Type::term(), Continuation::term()) -> none | {list(), term()}).
--spec (select_n(Type::term(), Cond::function(), N::integer()) -> none | {list(), term()}).
-```
-
-新增索引
-```
--spec (insert(Type::term(), Info::tuple()) -> boolean()).
-```
-
-移除房间
-```
--spec (delete(Type::term(), Key::integer()) -> boolean()).
-```
-
-更新房间人数
-```
--spec (incr(Type::term(), Key::integer(), Incr::integer()) -> undefined | integer()).
-```
-
 获取房间进程信息
 ```
--spec (get_pid(Type::term(), Key::integer()) -> undefined | {pid(), integer()}).
+-spec (get_pid(Type::term(), RoomId::integer()) -> undefined | pid()).
 ```

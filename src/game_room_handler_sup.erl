@@ -21,10 +21,10 @@
 %%====================================================================
 
 start_link(Handler) ->
-  supervisor:start_link(?MODULE, [Handler]).
+    supervisor:start_link(?MODULE, [Handler]).
 
 start_child(Pid, Args) ->
-  supervisor:start_child(Pid, [Args]).
+    supervisor:start_child(Pid, [Args]).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -32,7 +32,7 @@ start_child(Pid, Args) ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([Handler]) ->
-  {ok, { {simple_one_for_one, 3, 10}, [?CHILD(Handler)]} }.
+    {ok, { {simple_one_for_one, 3, 10}, [?CHILD(Handler)]} }.
 
 %%====================================================================
 %% Internal functions

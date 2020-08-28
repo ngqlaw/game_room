@@ -10,36 +10,31 @@
 -include("game_room.hrl").
 
 %% API
--export([start_link/0]).
--export([new/3, get_room_tab/1]).
+-export([start_link/1, new/2]).
 
 %% gen_server callbacks
 -export([
-  init/1,
-  handle_call/3,
-  handle_cast/2,
-  handle_info/2,
-  terminate/2,
-  code_change/3
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
 ]).
 
+-type(room_info() :: #game_room_type{}).
+
 -record(state, {
-  room_tab = undefined :: term(),
-  player_tab = undefined :: term()
-  }).
+    room_tab = undefined :: term()
+}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 %% 创建进程
--spec (new(pid(), pid(), term()) -> {integer(), pid()} | term()).
-new(Pid, TopPid, SubType) ->
-  gen_server:call(Pid, {new, TopPid, SubType}).
-
-%% 获取房间进程索引表
--spec (get_room_tab(pid()) -> term()).
-get_room_tab(Pid) ->
-  gen_server:call(Pid, get_room_tab).
+-spec (new(room_info(), term()) -> {integer(), pid()} | term()).
+new(#game_room_type{manager_pid = Pid, handle_sup_pid = SupPid}, SubType) ->
+    gen_server:call(Pid, {new, SupPid, SubType}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -47,10 +42,9 @@ get_room_tab(Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link() ->
-  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link() ->
-  gen_server:start_link(?MODULE, [], []).
+-spec(start_link(RoomTab :: term()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+start_link(RoomTab) ->
+    gen_server:start_link(?MODULE, [RoomTab], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -68,12 +62,10 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(init(Args :: term()) ->
-  {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term()} | ignore).
-init([]) ->
-  RoomTab = game_room_data:create(),
-  PlayerTab = game_room_player:create(),
-  {ok, #state{room_tab = RoomTab, player_tab = PlayerTab}}.
+    {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
+    {stop, Reason :: term()} | ignore).
+init([RoomTab]) ->
+    {ok, #state{room_tab = RoomTab}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -83,35 +75,31 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-  State :: #state{}) ->
-  {reply, Reply :: term(), NewState :: #state{}} |
-  {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
-  {stop, Reason :: term(), NewState :: #state{}}).
-handle_call({new, TopPid, Type}, _From, #state{room_tab = Tab} = State) ->
-  try
-    RoomId = game_room_data:add(Tab),
-    SupPid = game_room_type_sup:get_handler_sup(TopPid),
-    {ok, Pid} = game_room_handler_sup:start_child(SupPid, [RoomId, Type]),
-    erlang:monitor(process, Pid),
-    erlang:put({room, Pid}, RoomId),
-    game_room_data:insert(Tab, #game_room{
-      id = RoomId, 
-      num = 0, 
-      pid = Pid, 
-      type = Type
-    }),
-    {reply, {RoomId, Pid}, State}
-  catch
-    E:R ->
-      {reply, {E, R, erlang:get_stacktrace()}, State}
-  end;
-handle_call(get_room_tab, _From, #state{room_tab = Tab} = State) ->
-  {reply, Tab, State};
+    State :: #state{}) ->
+    {reply, Reply :: term(), NewState :: #state{}} |
+    {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
+    {noreply, NewState :: #state{}} |
+    {noreply, NewState :: #state{}, timeout() | hibernate} |
+    {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
+    {stop, Reason :: term(), NewState :: #state{}}).
+handle_call({new, SupPid, Type}, _From, #state{room_tab = Tab} = State) ->
+    try
+        RoomId = game_room_data:add(Tab),
+        {ok, Pid} = game_room_handler_sup:start_child(SupPid, [RoomId, Type]),
+        erlang:monitor(process, Pid),
+        erlang:put({room, Pid}, RoomId),
+        game_room_data:insert(Tab, #game_room{
+            id = RoomId,
+            pid = Pid,
+            type = Type
+        }),
+        {reply, {ok, RoomId, Pid}, State}
+    catch
+        E:R ->
+            {reply, {E, R}, State}
+    end;
 handle_call(_Request, _From, State) ->
-  {reply, unknown, State}.
+    {reply, unknown, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -121,11 +109,11 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(handle_cast(Request :: term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
+    {noreply, NewState :: #state{}} |
+    {noreply, NewState :: #state{}, timeout() | hibernate} |
+    {stop, Reason :: term(), NewState :: #state{}}).
 handle_cast(_Request, State) ->
-  {noreply, State}.
+    {noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -138,15 +126,15 @@ handle_cast(_Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
+    {noreply, NewState :: #state{}} |
+    {noreply, NewState :: #state{}, timeout() | hibernate} |
+    {stop, Reason :: term(), NewState :: #state{}}).
 handle_info({'DOWN', _Ref, process, Object, _Reason}, #state{room_tab = Tab} = State) ->
-  RoomId = erlang:erase({room, Object}),
-  game_room_data:delete(Tab, RoomId),
-  {noreply, State};
+    RoomId = erlang:erase({room, Object}),
+    game_room_data:delete(Tab, RoomId),
+    {noreply, State};
 handle_info(_Info, State) ->
-  {noreply, State}.
+    {noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -160,16 +148,14 @@ handle_info(_Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-  State :: #state{}) -> term()).
-terminate(_Reason, #state{room_tab = RoomTab, player_tab = PlayerTab} = _State) ->
-  try
-    game_room_data:clear(RoomTab),
-    game_room_player:clear(PlayerTab),
-    ok
-  catch
-    _E:_R ->
-      ok
-  end.
+    State :: #state{}) -> term()).
+terminate(_Reason, #state{room_tab = RoomTab} = _State) ->
+    try
+        game_room_data:clear(RoomTab),
+        ok
+    catch
+        _E:_R -> ok
+    end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -180,10 +166,10 @@ terminate(_Reason, #state{room_tab = RoomTab, player_tab = PlayerTab} = _State) 
 %% @end
 %%--------------------------------------------------------------------
 -spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
-  Extra :: term()) ->
-  {ok, NewState :: #state{}} | {error, Reason :: term()}).
+    Extra :: term()) ->
+    {ok, NewState :: #state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
-  {ok, State}.
+    {ok, State}.
 
 %%%===================================================================
 %%% Internal functions

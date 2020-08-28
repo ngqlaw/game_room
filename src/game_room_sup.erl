@@ -21,10 +21,10 @@
 %%====================================================================
 
 start_link() ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 start_child([Key|_] = Args) ->
-  supervisor:start_child(?SERVER, ?WORKER(game_room_type_sup, Key, Args)).
+    supervisor:start_child(?SERVER, ?WORKER(game_room_type_sup, Key, Args)).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -32,8 +32,8 @@ start_child([Key|_] = Args) ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-  game_room_process:create(),
-  {ok, { {one_for_one, 3, 10}, []} }.
+    game_room_type_index:create(),
+    {ok, { {one_for_one, 3, 10}, []} }.
 
 %%====================================================================
 %% Internal functions

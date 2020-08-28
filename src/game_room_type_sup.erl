@@ -7,47 +7,38 @@
 
 -behaviour(supervisor).
 
--include("game_room.hrl").
-
 %% API
--export([start_link/1, get_manager/1, get_handler_sup/1]).
+-export([start_link/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
--define(WORKER(Mod, Key), {{Mod, Key}, {Mod, start_link, []}, permanent, 5000, worker, [Mod]}).
--define(SUP(Mod, Key, Handler), {{Mod, Key}, {Mod, start_link, [Handler]}, permanent, 5000, supervisor, [Mod]}).
 
 %%====================================================================
 %% API functions
 %%====================================================================
 
 start_link(Args) ->
-  supervisor:start_link(?MODULE, Args).
-
-%% 获取房间管理进程
-get_manager(Pid) ->
-  Children = supervisor:which_children(Pid),
-  {_, ManagerPid, _, _} = lists:keyfind([game_room_manager], 4, Children),
-  ManagerPid.
-
-%% 获取房间进程监督树进程
-get_handler_sup(Pid) ->
-  Children = supervisor:which_children(Pid),
-  {_, SupPid, _, _} = lists:keyfind([game_room_handler_sup], 4, Children),
-  SupPid.
+    supervisor:start_link(?MODULE, Args).
 
 %%====================================================================
 %% Supervisor callbacks
 %%====================================================================
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init([Type, Handler]) ->
-  Manager = ?WORKER(game_room_manager, Type),
-  HandlerSup = ?SUP(game_room_handler_sup, Type, Handler),
-  true = game_room_process:update(#game_room_type{type = Type, pid = self()}),
-  {ok, { {one_for_all, 3, 10}, [Manager, HandlerSup]} }.
+init([Type, Handler, RoomTab]) ->
+    Manager = {
+        {game_room_manager, Type},
+        {game_room_manager, start_link, [RoomTab]},
+        permanent, 5000, worker, [game_room_manager]
+    },
+    HandlerSup = {
+        {game_room_handler_sup, Type},
+        {game_room_handler_sup, start_link, [Handler]},
+        permanent, 5000, supervisor, [game_room_handler_sup]
+    },
+    {ok, { {one_for_all, 3, 10}, [Manager, HandlerSup]} }.
 
 %%====================================================================
 %% Internal functions
